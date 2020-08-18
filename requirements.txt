@@ -1,0 +1,11 @@
+tensorflow
+jupyter
+pandas
+numpy
+matplotlib
+pydicom
+opencv-python
+scikit-image
+
+tqdm
+black
