@@ -4,7 +4,7 @@ Cardiac MRI classification using Recursive Neural Networks
 ## Getting Started
 
 1. Install requirements
-2. Copy data folder to root directory
+2. Copy `data` folder to root directory
 
 ```
 mri-classification
@@ -19,7 +19,7 @@ mri-classification
 ├── setup.py
 ```
 
-3. Install pip package (this is required for absolute imports)
+3. Install current project as pip package (this is required for absolute imports)
 
 ```
 pip install -e .
