@@ -25,7 +25,17 @@ mri-classification
 pip install -e .
 ```
 
-## Labeler Controls
+## Labeler
+
+### Run Labeler
+
+```
+python labeler.py --start START
+```
+
+- START: starting index (if you wish to start labeling in the middle)
+
+### Interface Controls
 
 - `h`: move backward by 10 slides
 - `l`: move forward by 10 slides
@@ -33,3 +43,4 @@ pip install -e .
 - `right-arrow`: move forward by 1 slide
 - `[1-5]`: select current label (oap to obs)
 - `left-click`: label the slice under the cursor
+- `spacebar`: save labels

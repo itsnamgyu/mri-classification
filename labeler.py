@@ -4,6 +4,7 @@ import os
 import re
 import shutil
 import warnings
+from argparse import ArgumentParser
 from collections import defaultdict
 from datetime import datetime
 import matplotlib as mpl
@@ -38,8 +39,10 @@ class Labeler:
             for patient, phases in patients.items():
                 for phase in phases:
                     self.slide_list.append((dataset, patient, phase))
+
         self.slide_list.sort()
         self.slide_index = 0
+
         self.current_label = labels[0]
         self.figure: Figure = plt.figure(figsize=(10, 8))
         self.figure.canvas.set_window_title("Cardiac MRI Slice Labeler")
@@ -52,7 +55,9 @@ class Labeler:
 
         self.abort_update = False
 
-    def label_interface(self):
+    def label_interface(self, start=None):
+        if start:
+            self.slide_index = max(min(start - 1, len(self.slide_list)- 1), 0)
         self.figure.canvas.mpl_connect("key_press_event", self._on_key_press)
         self.figure.canvas.mpl_connect("button_press_event", self._on_button_press)
         self._update_figure()
@@ -89,6 +94,11 @@ class Labeler:
             return
         except (ValueError, IndexError):
             pass
+
+        # Save labels
+        if event.key == " ":
+            self.save_labels()
+            return
 
         # Slide change
         if event.key == "left":
@@ -157,6 +167,9 @@ class Labeler:
 
 
 if __name__ == "__main__":
+    parser = ArgumentParser()
+    parser.add_argument("--start", "-S", type=int)
+    args = parser.parse_args()
     labeler = Labeler()
-    labeler.label_interface()
+    labeler.label_interface(start=args.start)
     labeler.save_labels()
