@@ -1,15 +1,7 @@
-import glob
-import json
-import os
-import re
-import shutil
 import warnings
 from argparse import ArgumentParser
-from collections import defaultdict
-from datetime import datetime
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-import matplotlib.image
 import matplotlib.cm
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
@@ -53,13 +45,12 @@ class Labeler:
             ax.set_axis_off()
             ax.set_title("", fontsize=9, fontweight="bold")
 
-        self.abort_update = False
-
     def label_interface(self, start=None):
         if start:
             self.slide_index = max(min(start - 1, len(self.slide_list)- 1), 0)
         self.figure.canvas.mpl_connect("key_press_event", self._on_key_press)
         self.figure.canvas.mpl_connect("button_press_event", self._on_button_press)
+        self.figure.canvas.mpl_connect("resize_event", self._on_resize)
         self._update_figure()
         plt.show()
 
@@ -76,7 +67,6 @@ class Labeler:
         return slices
 
     def _on_button_press(self, event):
-        self.abort_update = True
         for i, ax in enumerate(self.figure.get_axes()):
             if event.inaxes == ax:
                 try:
@@ -111,6 +101,9 @@ class Labeler:
             self.slide_index += 10
         self.slide_index = self.slide_index % len(self.slide_list)
         self._update_figure()
+
+    def _on_resize(self, event):
+        self.figure.tight_layout(w_pad=0.75, h_pad=1)
 
     def _update_figure_title(self, draw=True):
         dataset, patient, phase = self.slide_list[self.slide_index]
