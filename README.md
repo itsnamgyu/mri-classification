@@ -44,3 +44,11 @@ python labeler.py --start START
 - `[1-5]`: select current label (oap to obs)
 - `left-click`: label the slice under the cursor
 - `spacebar`: save labels
+
+## Data
+
+### Dataset Acronyms
+
+- `KAG`: Kaggle Data
+- `CAT`: CAP Training Data
+- `CAV`: CAP Validation Data
