@@ -15,8 +15,15 @@ mpl.rcParams["font.sans-serif"] = ["Arial"]
 mpl.rcParams["image.interpolation"] = "none"
 
 
+
 class Labeler:
-    def __init__(self, data=None):
+    class InvalidQueryException(Exception):
+        message = "No data matching that query"
+
+    class NoDataException(Exception):
+        message = "No data to label"
+
+    def __init__(self, data=None, dataset=None, phase=None, patient=None):
         if data and isinstance(data, Data):
             self.data = data
         else:
@@ -26,11 +33,23 @@ class Labeler:
                 )
             self.data = Data()
 
-        self.slide_list = []  # (dataset, patient, phase
-        for dataset, patients in self.data.data.items():
-            for patient, phases in patients.items():
-                for phase in phases:
-                    self.slide_list.append((dataset, patient, phase))
+        if not self.data.data:
+            raise Labeler.NoDataException()
+
+        self.slide_list = []  # (dataset, patient, phase). Only these are considered for labeling.
+        for _dataset, patients in self.data.data.items():
+            if dataset is not None and dataset != _dataset:
+                continue
+            for _patient, phases in patients.items():
+                if patient is not None and patient != _patient:
+                    continue
+                for _phase in phases:
+                    if phase is not None and phase != _phase:
+                        continue
+                    self.slide_list.append((_dataset, _patient, _phase))
+
+        if not self.slide_list:
+            raise Labeler.InvalidQueryException()
 
         self.slide_list.sort()
         self.slide_index = 0
@@ -159,10 +178,20 @@ class Labeler:
         self.figure.canvas.draw()
 
 
-if __name__ == "__main__":
+def main():
     parser = ArgumentParser()
+
     parser.add_argument("--start", "-S", type=int)
+    parser.add_argument("--dataset", "-D")
+    parser.add_argument("--phase", "-P")
     args = parser.parse_args()
-    labeler = Labeler()
+    try:
+        labeler = Labeler(dataset=args.dataset, phase=args.phase)
+    except (Labeler.InvalidQueryException, Labeler.NoDataException) as e:
+        print(e.message)
+        return
     labeler.label_interface(start=args.start)
     labeler.save_labels()
+
+if __name__ == "__main__":
+    main()
