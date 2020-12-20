@@ -3,6 +3,7 @@ pandas
 numpy
 matplotlib
 scikit-image
+scikit-learn
 tqdm
 black
 -r requirements_conda.txt
