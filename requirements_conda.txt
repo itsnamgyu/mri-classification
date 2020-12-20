@@ -1,0 +1,3 @@
+# requirements that are not available on conda
+pydicom
+opencv-python

@@ -1,0 +1,14 @@
+name: mri
+dependencies:
+  - python>=3.8
+  - tensorflow-gpu~=2.2.0
+  - jupyter
+  - pandas
+  - numpy
+  - matplotlib
+  - scikit-image
+  - tqdm
+  - black
+  - pip
+  - pip:
+    - -r file:requirements_conda.txt

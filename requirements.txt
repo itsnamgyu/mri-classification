@@ -2,9 +2,7 @@ jupyter
 pandas
 numpy
 matplotlib
-pydicom
-opencv-python
 scikit-image
-
 tqdm
 black
+-r requirements_conda.txt
