@@ -7,9 +7,8 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from typing import List
 
-from skimage.transform import resize
-
-from data import Data, labels
+from data import Data, labels, re_path
+from results import *
 
 mpl.rcParams["font.sans-serif"] = ["Arial"]
 mpl.rcParams["image.interpolation"] = "none"
@@ -23,7 +22,7 @@ class Labeler:
     class NoDataException(Exception):
         message = "No data to label"
 
-    def __init__(self, data=None, dataset=None, phase=None, patient=None):
+    def __init__(self, data=None, dataset=None, phase=None, patient=None, predictions=None):
         if data and isinstance(data, Data):
             self.data = data
         else:
@@ -48,11 +47,24 @@ class Labeler:
                         continue
                     self.slide_list.append((_dataset, _patient, _phase))
 
+        # If predictions, only show phases that have been predicted
+        if predictions:
+            string_keys = set(predictions.keys())
+            key_set = set()
+            for string_key in string_keys:
+                match = re_path.search(string_key)
+                dataset, patient, phase, sid = match.groups()
+                patient, phase, sid = int(patient), int(phase), int(sid)
+                key_set.add((dataset, patient, phase))
+            key_set = key_set.intersection(set(self.slide_list))
+            self.slide_list = list(sorted(list(key_set)))
+
         if not self.slide_list:
             raise Labeler.InvalidQueryException()
 
         self.slide_list.sort()
         self.slide_index = 0
+        self.predictions = predictions
 
         self.current_label = labels[0]
         self.figure: Figure = plt.figure(figsize=(10, 8))
@@ -146,13 +158,29 @@ class Labeler:
 
         # Ax Titles
         for i, item in enumerate(slices):
-            sid, image_id = item
-            title = "Slice {} ({})".format(
-                sid, self.data.labels.get(image_id, "N/A")
-            ).upper()
+            slice_index, sid = item
+            ground_truth = self.data.labels.get(sid, "N/A")
+            prediction = None
+            if self.predictions:
+                try:
+                    prediction = self.predictions[sid]["prediction"]
+                except KeyError:
+                    prediction = None
+            if prediction:
+                title = "Slice {} ({}) (P={})".format(
+                    slice_index, ground_truth.upper(), prediction.upper())
+            else:
+                title = "Slice {} ({})".format(
+                    slice_index, ground_truth.upper())
             # PRIVATE INTERFACE (tampers with private attributes for speed)
             if axes[i].title._text != title:
-                axes[i].set_title(title, fontsize=9, fontweight="bold")
+                if prediction:
+                    if prediction == ground_truth:
+                        axes[i].set_title(title, fontsize=9, fontweight="bold", color="green")
+                    else:
+                        axes[i].set_title(title, fontsize=9, fontweight="bold", color="red")
+                else:
+                    axes[i].set_title(title, fontsize=9, fontweight="bold")
         if draw:
             self.figure.canvas.draw()
 
@@ -170,6 +198,8 @@ class Labeler:
         for i, item in enumerate(slices):
             sid, image_id = item
             image = self.data.load_image(image_id)
+            axes[i].clear()
+            axes[i].set_axis_off()
             axes[i].imshow(image, cmap=mpl.cm.gray)
         self._update_ax_titles()
         self._update_figure_title()
@@ -184,14 +214,52 @@ def main():
     parser.add_argument("--start", "-S", type=int)
     parser.add_argument("--dataset", "-D")
     parser.add_argument("--phase", "-P")
+    parser.add_argument("--results", "-R", help="Show prediction results", action="store_true")
     args = parser.parse_args()
+
+    result_key = None
+    if args.results:
+        result_keys = get_result_keys()
+        print("Select result")
+        print("-" * 80)
+        print("{:5s}{:55s}{:20s}".format("#", "TITLE", "ACCURACY"))
+        for i, key in enumerate(result_keys):
+            accuracy = 0
+            try:
+                with open(get_result_path(key)) as f:
+                    results = json.load(f)
+                    accuracy = results["accuracy"]
+            except:
+                pass
+            print("{:<5d}{:55s}{:<20.4f}".format(i, key, accuracy))
+        print("-" * 80)
+        print("Select result: ", end="")
+        while True:
+            try:
+                selection = int(input())
+                result_key = result_keys[selection]
+                break
+            except (ValueError, IndexError):
+                continue
+
+    predictions = None
+    if result_key:
+        predictions_path = get_predictions_path(result_key)
+        try:
+            with open(predictions_path) as f:
+                predictions = json.load(f)
+                print("Loaded predictions")
+        except:
+            print("No predictions in {}".format(predictions_path))
+
     try:
-        labeler = Labeler(dataset=args.dataset, phase=args.phase)
+        labeler = Labeler(dataset=args.dataset, phase=args.phase, predictions=predictions)
     except (Labeler.InvalidQueryException, Labeler.NoDataException) as e:
         print(e.message)
         return
     labeler.label_interface(start=args.start)
     labeler.save_labels()
+
 
 if __name__ == "__main__":
     main()
