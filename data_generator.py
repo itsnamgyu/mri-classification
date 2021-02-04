@@ -1,4 +1,5 @@
 import math
+from collections import defaultdict
 from typing import List
 
 import numpy as np
@@ -7,6 +8,7 @@ from PIL import Image
 from tensorflow.python.keras.preprocessing.image import img_to_array
 
 from data import Data
+from utils import split_keys
 
 LABEL_INDEX = {
     'ap': 0,
@@ -17,9 +19,51 @@ LABEL_INDEX = {
 }
 
 
+def _filter_patients(data: Data, datasets=None, split_index=None, split_ratio=(70, 30), split_seed=""):
+    """
+    Filter data by dataset and patient-wise split
+
+    :param data:
+    :param datasets:
+    :param split_index:
+    If none, use all data
+    :param split_ratio:
+    :param split_seed:
+    :return: {
+        dataset: [
+            patient, ...
+        ], ...
+    }
+    """
+    ret = defaultdict(list)
+
+    if datasets is None:
+        datasets = list(data.data.keys())
+    if isinstance(datasets, str):
+        datasets = [datasets]
+
+    # Build patient_keys: "KAG_PA000000"
+    patient_keys = list()
+    for dataset in datasets:
+        for patient in data.data[dataset].keys():
+            patient_keys.append("{}_PA{:06d}".format(dataset, patient))
+
+    if split_index is not None:
+        splits = split_keys(patient_keys, split_ratio, seed=split_seed)
+        patient_keys = splits[split_index]
+
+    for key in patient_keys:
+        dataset = key[:3]
+        patient = int(key[-6:])
+        ret[dataset].append(patient)
+
+    return ret
+
+
 class PhaseDataGenerator(tf.keras.utils.Sequence):
     def __init__(self, data: Data, datasets=None, batch_size=32, target_size=(224, 224),
-                 slices_per_sample=25, shuffle=True, image_data_generator=None):
+                 slices_per_sample=25, shuffle=True, image_data_generator=None,
+                 split_index=None, split_ratio=(70, 30), split_seed=""):
         self.data = data
         self.datasets = datasets
         self.batch_size = batch_size
@@ -34,16 +78,15 @@ class PhaseDataGenerator(tf.keras.utils.Sequence):
         self.samples = dict()
         self.max_slices = 1
 
-        if datasets is None:
-            datasets = list(data.data.keys())
-        if isinstance(datasets, str):
-            datasets = [datasets]
-
+        patients_by_dataset = _filter_patients(data, datasets, split_index, split_ratio, split_seed)
+        # Build self.samples: { "KAG_000000_00": [ sid, ... ] }
         # All plural variables are dicts
-        for dataset in datasets:
-            for patient, phases in data.data[dataset].items():
+        for dataset, _patients in patients_by_dataset.items():
+            dataset_data = data.data[dataset]
+            for patient in _patients:
+                phases = dataset_data[patient]
                 for phase, slices in phases.items():
-                    key = "{dataset}_{patient:06d}_{slice:02d}".format(dataset=dataset, patient=patient, slice=phase)
+                    key = "{dataset}_{patient:06d}_{phase:02d}".format(dataset=dataset, patient=patient, phase=phase)
                     self.samples[key] = slices
                     if len(slices) > self.max_slices:
                         self.max_slices = len(slices)
@@ -52,13 +95,14 @@ class PhaseDataGenerator(tf.keras.utils.Sequence):
             raise ValueError("There are some samples that contain more than {} slices ({})".format(
                 slices_per_sample, self.max_slices))
 
+        # Check unlabeled slices
         unlabeled = []
         self.images_by_label = [0] * len(self.label_indices)
-        for phases in self.samples.values():
-            for phase in phases.values():
-                label = self.data.labels.get(phase, None)
+        for slices in self.samples.values():
+            for sid in slices.values():
+                label = self.data.labels.get(sid, None)
                 if label is None:
-                    unlabeled.append(phase)
+                    unlabeled.append(sid)
                 else:
                     index = self.label_indices[label]
                     self.images_by_label[index] += 1
@@ -131,7 +175,8 @@ class PhaseDataGenerator(tf.keras.utils.Sequence):
 
 class SliceDataGenerator(tf.keras.utils.Sequence):
     def __init__(self, data: Data, datasets=None, batch_size=32,
-                 target_size=(224, 224), shuffle=True, image_data_generator=None):
+                 target_size=(224, 224), shuffle=True, image_data_generator=None,
+                 split_index=None, split_ratio=(70, 30), split_seed=""):
         self.data = data
         self.datasets = datasets
         self.batch_size = batch_size
@@ -144,14 +189,11 @@ class SliceDataGenerator(tf.keras.utils.Sequence):
 
         self.slices = list()
 
-        if datasets is None:
-            datasets = list(data.data.keys())
-        if isinstance(datasets, str):
-            datasets = [datasets]
-
-        # All plural variables are dicts
-        for dataset in datasets:
-            for patient, phases in data.data[dataset].items():
+        patients_by_dataset = _filter_patients(data, datasets, split_index, split_ratio, split_seed)
+        for dataset, _patients in patients_by_dataset.items():
+            dataset_data = self.data.data[dataset]
+            for patient in _patients:
+                phases = dataset_data[patient]
                 for phase, slices in phases.items():
                     sids = [item[1] for item in slices.items()]
                     self.slices.extend(sids)
