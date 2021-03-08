@@ -127,6 +127,8 @@ class PhaseDataGenerator(tf.keras.utils.Sequence):
         # img = load_img(path, color_mode="rgb", target_size=self.target_size)
         x = img_to_array(img, data_format="channels_last")
         x = x / 65536 * 255  # color processing (for current png formats)
+        if x.shape[-1] == 1:  # channel count is very unstable wrt env
+            x = np.concatenate([x]*3, axis=-1)
         if self.datagen:
             params = self.datagen.get_random_transform(x.shape)
             x = self.datagen.apply_transform(x, params)
@@ -228,6 +230,8 @@ class SliceDataGenerator(tf.keras.utils.Sequence):
         # img = load_img(path, color_mode="rgb", target_size=self.target_size)
         x = img_to_array(img, data_format="channels_last")
         x = x / 65536 * 255
+        if x.shape[-1] == 1:  # channel count is very unstable wrt env
+            x = np.concatenate([x]*3, axis=-1)
         if self.datagen:
             params = self.datagen.get_random_transform(x.shape)
             x = self.datagen.apply_transform(x, params)
