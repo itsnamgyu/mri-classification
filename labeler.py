@@ -13,6 +13,9 @@ from results import *
 mpl.rcParams["font.sans-serif"] = ["Arial"]
 mpl.rcParams["image.interpolation"] = "none"
 
+# If the figure does not update, try
+# matplotlib.use("TkAgg")
+
 
 
 class Labeler:
@@ -68,13 +71,19 @@ class Labeler:
 
         self.current_label = labels[0]
         self.figure: Figure = plt.figure(figsize=(10, 8))
-        self.figure.canvas.set_window_title("Cardiac MRI Slice Labeler")
+        if self.figure.canvas.manager is not None:
+            self.figure.canvas.manager.set_window_title("Cardiac MRI Slice Labeler")
+
         self.figure.suptitle("", fontsize=12, fontweight="bold")
 
         axes = self.figure.subplots(4, 6).flatten()
         for ax in axes:
             ax.set_axis_off()
             ax.set_title("", fontsize=9, fontweight="bold")
+
+    def draw(self):
+        # self.figure.canvas.draw()
+        self.figure.canvas.draw_idle()
 
     def label_interface(self, start=None):
         if start:
@@ -149,7 +158,7 @@ class Labeler:
         self.figure.suptitle(title, fontsize=12, fontweight="bold")
 
         if draw:
-            self.figure.canvas.draw()
+            self.draw()
 
     def _update_ax_titles(self, draw=True):
         axes: List[Axes] = self.figure.get_axes()
@@ -167,22 +176,20 @@ class Labeler:
                 except KeyError:
                     prediction = None
             if prediction:
-                title = "Slice {} ({}) (P={})".format(
-                    slice_index, ground_truth.upper(), prediction.upper())
+                title = "Slice {} ({}) (P={})".format(slice_index, ground_truth.upper(), prediction.upper())
             else:
-                title = "Slice {} ({})".format(
-                    slice_index, ground_truth.upper())
+                title = "Slice {} ({})".format(slice_index, ground_truth.upper())
             # PRIVATE INTERFACE (tampers with private attributes for speed)
-            if axes[i].title._text != title:
-                if prediction:
-                    if prediction == ground_truth:
-                        axes[i].set_title(title, fontsize=9, fontweight="bold", color="green")
-                    else:
-                        axes[i].set_title(title, fontsize=9, fontweight="bold", color="red")
+            # if axes[i].title._text != title:
+            if prediction:
+                if prediction == ground_truth:
+                    axes[i].set_title(title, fontsize=9, fontweight="bold", color="green")
                 else:
-                    axes[i].set_title(title, fontsize=9, fontweight="bold")
+                    axes[i].set_title(title, fontsize=9, fontweight="bold", color="red")
+            else:
+                axes[i].set_title(title, fontsize=9, fontweight="bold")
         if draw:
-            self.figure.canvas.draw()
+            self.draw()
 
     def _update_figure(self):
         axes: List[Axes] = self.figure.get_axes()
@@ -191,21 +198,28 @@ class Labeler:
         dataset, patient, phase = self.slide_list[self.slide_index]
         slices = sorted(self.data.data[dataset][patient][phase].items())
 
-        for ax in axes:
-            ax.images = []
-            # PRIVATE INTERFACE (tampers with private attributes for speed)
-            ax.title._text = ""
-        for i, item in enumerate(slices):
-            sid, image_id = item
-            image = self.data.load_image(image_id)
+        for i, ax in enumerate(axes):
+            # ax.images = []
+            # # PRIVATE INTERFACE (tampers with private attributes for speed)
+            # ax.title._text = ""
             axes[i].clear()
             axes[i].set_axis_off()
-            axes[i].imshow(image, cmap=mpl.cm.gray)
-        self._update_ax_titles()
-        self._update_figure_title()
+            if i < len(slices):
+                sid, image_id = slices[i]
+                image = self.data.load_image(image_id)
+                axes[i].imshow(image, cmap=mpl.cm.gray)
+
+        # for i, item in enumerate(slices):
+        #     sid, image_id = item
+        #     image = self.data.load_image(image_id)
+        #     axes[i].clear()
+        #     axes[i].set_axis_off()
+        #     axes[i].imshow(image, cmap=mpl.cm.gray)
+        self._update_ax_titles(draw=False)
+        self._update_figure_title(draw=False)
 
         self.figure.tight_layout(w_pad=0.75, h_pad=1)
-        self.figure.canvas.draw()
+        self.draw()
 
 
 def main():
