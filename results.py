@@ -33,7 +33,7 @@ def compile_predictions_from_phase_output(data: Data, preds, slice_index: List[L
             d = dict()
             scores = dict()
             for i, label in enumerate(labels):
-                scores[label] = slice_preds[i]
+                scores[label] = str(slice_preds[i])
             d["scores"] = scores
             d["prediction"] = labels[slice_preds.argmax()]
             d["ground_truth"] = data.labels[sid]
