@@ -121,7 +121,10 @@ class PhaseDataGenerator(tf.keras.utils.Sequence):
     def _get_sample_key_batch(self, index):
         return self.sample_keys[index * self.batch_size:(index + 1) * self.batch_size]
 
-    def _load_and_preprocess_image(self, path, standardize=False):
+    def _get_transform_params(self):
+        return self.datagen.get_random_transform([3] + list(self.target_size))
+
+    def _load_and_preprocess_image(self, path, standardize=False, transform_params=None):
         img = Image.open(path)
         img = img.resize(self.target_size, Image.NEAREST)
         # img = load_img(path, color_mode="rgb", target_size=self.target_size)
@@ -130,8 +133,9 @@ class PhaseDataGenerator(tf.keras.utils.Sequence):
         if x.shape[-1] == 1:  # channel count is very unstable wrt env
             x = np.concatenate([x]*3, axis=-1)
         if self.datagen:
-            params = self.datagen.get_random_transform(x.shape)
-            x = self.datagen.apply_transform(x, params)
+            if transform_params is None:
+                transform_params = self._get_transform_params()
+            x = self.datagen.apply_transform(x, transform_params)
             if standardize:
                 x = self.datagen.standardize(x)
         return x
@@ -158,9 +162,10 @@ class PhaseDataGenerator(tf.keras.utils.Sequence):
         y = np.zeros((batch_size, self.slices_per_sample) + (self.n_classes,))
         for i, key in enumerate(keys):
             items = sorted(list(self.samples[key].items()))
+            transform_params = self._get_transform_params()
             for j, (slice_index, sid) in enumerate(items):
                 path = self.data.paths[sid]
-                image = self._load_and_preprocess_image(path, standardize=True)
+                image = self._load_and_preprocess_image(path, transform_params=transform_params, standardize=True)
                 x[i][j] = image
                 label = self.data.labels[sid]
                 label_index = self.label_indices[label]
